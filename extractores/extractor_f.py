@@ -4,19 +4,8 @@ import pandas as pd
 from datetime import datetime
 
 # ================================
-# CONFIGURACIÓN
-# ================================
-carpeta_entrada = "entrada"
-carpeta_salida = "salida"
-archivo_salida = os.path.join(carpeta_salida, "resultado_f.xlsx")
-archivo_log = os.path.join(carpeta_salida, "log_errores.txt")
-
-os.makedirs(carpeta_salida, exist_ok=True)
-
-# ================================
 # CATEGORÍAS Y AGRUPACIONES
 # ================================
-# Puedes modificar fácilmente estas agrupaciones en el futuro.
 categorias_fusion = {
     "A_JACUZZI_FETI": ["AMANECIDA-JACUZI F", "AMANECIDA JACUZZI", "AMANECIDA-jacuzzi", "AMANECIDA NACUZZI"],
     "R_SEN_PARQ": ["RATO-SENC-PARQ"],
@@ -30,7 +19,12 @@ categorias_fusion = {
     "R_ROJA": ["RATO ROJA"],
     "A_ROJA": ["AMANECIDA ROJA", "Amanecida Roja A"],
     "H_ADC_MAN": ["HORA-ADI-MANSION"],
-    "HORA_ADC": ["HORA-ADI-FETICHE-PAR", "HORA-ADI-SENCI-PARQ", "HORA-ADI-FETICHE", "HORA ADICIONAL"],
+    "HORA_ADC": [
+        "HORA-ADI-FETICHE-PAR",
+        "HORA-ADI-SENCI-PARQ",
+        "HORA-ADI-FETICHE",
+        "HORA ADICIONAL"
+    ],
     "JACUZZI_MAN": ["/JACUZI MANSION"],
     "JACUZZI": ["/JACUZZI"],
     "PER_ADC_ES": ["/PERSONA ADICIONAL E"],
@@ -50,19 +44,18 @@ def limpiar_numero(texto):
     except ValueError:
         return 0
 
-
-def sumar_categorias(datos, nombres):
-    """Suma cantidad y valor de varias columnas."""
-    total_cant = sum(datos.get(f"{n}_cant", 0) or 0 for n in nombres)
-    total_valor = sum(datos.get(f"{n}_valor", 0) or 0 for n in nombres)
-    return total_cant, total_valor
-
 # ================================
 # PROCESAR ARCHIVO INDIVIDUAL
 # ================================
 def procesar_archivo(ruta_archivo):
+    """
+    Procesa un archivo de texto (.txt) y devuelve un diccionario con los datos extraídos.
+    Compatible con Flask/Render: no usa carpetas locales.
+    """
     datos = {"archivo": os.path.basename(ruta_archivo)}
+
     try:
+        # --- Leer el contenido directamente ---
         with open(ruta_archivo, "r", encoding="utf-8", errors="ignore") as f:
             texto = f.read()
 
@@ -86,7 +79,7 @@ def procesar_archivo(ruta_archivo):
             datos[f"{cat}_cant"] = 0
             datos[f"{cat}_valor"] = 0
 
-        # --- Buscar coincidencias por cada subcategoría ---
+        # --- Buscar coincidencias ---
         for linea in texto.splitlines():
             for grupo, subcats in categorias_fusion.items():
                 for subcat in subcats:
@@ -98,45 +91,9 @@ def procesar_archivo(ruta_archivo):
                         datos[f"{grupo}_cant"] += cantidad
                         datos[f"{grupo}_valor"] += valor
 
-        return datos, None  # None = sin error
+        # ✅ Devuelve resultado limpio (sin escribir archivos)
+        return datos, None
 
     except Exception as e:
+        # ❌ Si falla, devuelve el error
         return datos, str(e)
-
-# ================================
-# EJECUCIÓN PRINCIPAL
-# ================================
-resultados = []
-errores = []
-
-for archivo in os.listdir(carpeta_entrada):
-    if archivo.lower().endswith(".txt"):
-        ruta = os.path.join(carpeta_entrada, archivo)
-        datos, error = procesar_archivo(ruta)
-        resultados.append(datos)
-        if error:
-            errores.append(f"[{datetime.now()}] ERROR en {archivo}: {error}")
-        else:
-            errores.append(f"[{datetime.now()}] OK: {archivo} procesado correctamente.")
-
-# ================================
-# EXPORTAR RESULTADOS
-# ================================
-df = pd.DataFrame(resultados)
-df.to_excel(archivo_salida, index=False)
-
-# Guardar log
-with open(archivo_log, "w", encoding="utf-8") as log:
-    for linea in errores:
-        log.write(linea + "\n")
-
-# Mostrar resumen
-print("=================================")
-print(" PROCESO FINALIZADO")
-print("=================================")
-print(f"Archivos procesados: {len(resultados)}")
-print(f"Archivo Excel generado: {archivo_salida}")
-print(f"Log de errores: {archivo_log}")
-print("=================================")
-for e in errores:
-    print(e)
